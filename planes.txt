@@ -1,0 +1,20 @@
+Hacer la versión actual (en la que se ingresa la IP y el puerto por teclado) en una rama llamada "alfa".
+
+Organizar el código en diferentes archivos: usar archivos de cabecera con los prototipos de las funciones y la declaración en otro lugar.
+Hacer un programa main en el que se pueda elegir si crear un servidor o conectarse a uno.
+Al crearse el servidor según las opciones: deberá obtenerse automáticamente la dirección IP y mostrarase para compartirla y esperar la conexión de alguien más; solicitar por teclado el puerto al que se conectará, ofreciendo un puerto por defecto.
+Tal vez hacer un soporte para IPv6.
+Agregar a futuro la posibilidad de enviar archivos y otros tipos de datos además de texto.
+
+Hacer un sistema de nombres de usuario para mostrar en el mensaje el nombre del usuario (con un color que se pueda elegir en el menú de opciones) y la fecha en la que el mensaje se envió.
+Agregar la opción de configurar opciones técnicas, como el número de intentos para conectarse a un servidor...
+
+Implementar un loggin opcional en el servidor o un sistema en el que se solicite al servidor el permiso para ingresar al chat.
+
+
+*En un futuro...
+	Buscar cómo capturar las pulsaciones del teclado para hacer un menú que pueda manejarse desde el teclado, sin escribir la opción. (HACER PRONTO).
+	
+	Buscar sobre el cifrado para evitar el sniffing en la red.
+	
+	Investigar cómo hacer que funcione fuera de red local.
