@@ -8,12 +8,14 @@
 #include<ifaddrs.h>
 #include<netdb.h>
 
+#include<arpa/inet.h>
 
 
 
+
+// Guarda la IP local en la dirección del argumento.
 int gethostip(char *hostip)
 {
-    // Guarda la IP local en la dirección del argumento.
 	struct ifaddrs *ifaddr, *ifa;
 	int family, s;
  
@@ -55,18 +57,27 @@ bool allint(char* string){
 }
 */
 
+
+/*
+Llamada al sistema socket.
+Primer argumento: Puntero a variable contenedora del file descriptor del socket.
+Segundo argumento: Tipo de socket TCP (servidor o cliente).
+*/
 t_estado f_socket(int *sockfd, char* est){ 
-	/*
-	Llamada al sistema socket.
-	Primer argumento: Puntero a variable contenedora del file descriptor del socket.
-	Segundo argumento: Tipo de socket TCP (servidor o cliente).
-	*/
 	if((*sockfd = socket(AF_INET, SOCK_STREAM, 0))==-1){
 		fprintf(stderr, "[%s-error]: creación del socket fallida. %d: %s\n",est,errno, strterror(errno));
 		return ERROR;
 	}
 	printf("[%s]: socket creado satisfactoriamente.\n",est);
 	return OK;
+}
+
+void initservaddr(struct sockaddr_in *servaddr, char* IPv4, unsigned int puerto){
+	memset(servaddr, 0, sizeof(servaddr));
+
+	servaddr->sin_family = AF_INET; // Familia IPv4.
+	servaddr->sin_addr.s_addr = inet_addr(IPv4); // Función de <arpa/inet.h>.
+	servaddr->sin_port = htons(puerto); // Función de <arpa/inet.h>. Cambia el orden de bytes al formato de la red.
 }
 
 t_estado f_bind(int sockfd, struct sockaddr_in *servaddr, char* est){
@@ -87,4 +98,17 @@ t_estado f_listen(int sockfd, struct sockaddr_in servaddr, int maxClients, char*
 	return OK;
 }
 
-t_estado f_accept(int sockfd, struct sockaddr_in *client,)
+
+/*
+Se mantiene a la espera de una conección de algún cliente.
+Se retorna un file descriptor de un socket que permite la conección al cliente.
+Se guardan los datos del cliente en la estructura del parámetro CLIENT.
+*/
+int f_accept(int sockfd, struct sockaddr_in *client){
+	int len = sizeof(*client), \
+	conectionfd = accept(sockfd, (struct sockaddr*) client, &len);
+
+	return conectionfd;
+
+}
+
