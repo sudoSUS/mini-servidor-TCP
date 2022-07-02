@@ -18,3 +18,24 @@ Implementar un loggin opcional en el servidor o un sistema en el que se solicite
 	Buscar sobre el cifrado para evitar el sniffing en la red.
 	
 	Investigar cómo hacer que funcione fuera de red local.
+	
+
+Menú
+	Función con argumentos para el porcentaje a usar en vertical y horizontal.
+	
+	Hacer que la ventana principal tenga un título o imagen ASCII.
+	
+	Elegir colores para el fondo de la ventana principal, de la subventana, de las opciones...
+	
+	Considerar hacer un separador para cada opción (con guiones o algo parecido).
+
+	Una subventana del tamaño de los argumentos.
+	
+	Para la impresión de cada opción, hacer que, al llegar al ancho de la ventana (antes del margen), se corte y continúe en la siguiente línea.
+		Puede agregarse un salto de línea luego de la declaración del arreglo con las opciones cada N número de caracteres que sobrepasen el margen.
+	
+	Adaptar cada opción para tener la misma altura que la opción con más líneas.
+	
+	
+	*A futuro
+		Hacer algo parecido a un recorrido de la pantalla cuando, al haber más opciones de las que se pueden mostrar en la pantalla, se quiera bajar más. Se imprimirán las opciones según la cantidad de líneas que se deban de bajar.
