@@ -5,6 +5,8 @@
 #include<ctype.h>
 #include<errno.h>
 
+#include<ncurses.h>
+
 #include<ifaddrs.h>
 #include<netdb.h>
 
@@ -65,7 +67,7 @@ Segundo argumento: Tipo de socket TCP (servidor o cliente).
 */
 t_estado f_socket(int *sockfd, char* est){ 
 	if((*sockfd = socket(AF_INET, SOCK_STREAM, 0))==-1){
-		fprintf(stderr, "[%s-error]: creación del socket fallida. %d: %s\n",est,errno, strterror(errno));
+		fprintf(stderr, "[%s-error]: creación del socket fallida. %d: %s\n",est,errno, strerror(errno));
 		return ERROR;
 	}
 	printf("[%s]: socket creado satisfactoriamente.\n",est);
@@ -112,3 +114,87 @@ int f_accept(int sockfd, struct sockaddr_in *client){
 
 }
 
+
+/*
+Los argumentos que se reciben son el porcentaje de la pantalla que usará la ventana del menú.
+El argumento CENTRADO define si las opciones estarán centradas o hacia la izquierda:
+	0: izquierda.
+	1: centro.
+*/
+t_estado menu_principal(float alto_porc, float ancho_porc, short centrado){
+	if (alto_porc>100 || ancho_porc>100 || alto_porc<0 || ancho_porc<0) return ERROR; 
+	// Comprueba si las entradas son válidas.
+	
+	initscr(); cbreak(); noecho(); curs_set(0);
+
+	int h,w;
+	getmaxyx(stdscr, h, w);
+	h++,w++; // Comentar la línea si getmaxyx retorna el tamaño y no la posición.
+
+	alto_porc/=100, ancho_porc/=100; // Para no dividir entre 100 cada vez.
+	// Los parámetros de la posición de newwin.
+	int centro_horiz=(w/2.0-w/2)?w/2+1:w/2, // Posición de la mitad de las columnas.
+	nlines=((int)(h*alto_porc)%2)?h*alto_porc:h*alto_porc+1,
+	ncols=((int)(w*ancho_porc)%2)?w*ancho_porc:w*ancho_porc+1,
+	begin_y = h-h*alto_porc,
+	begin_x = ((centro_horiz-ancho_porc*w/2.0)-(centro_horiz-ancho_porc*w/2))? (centro_horiz-ancho_porc*w/2)+1: \
+	(centro_horiz-ancho_porc*w/2); 
+
+	//printw("Centro:%d - nlines:%d - ncols:%d - begin_y:%d - begin_x:%d - h:%d - w:%d - alt_por:%f - ancho_por:%f",centro_horiz,nlines,ncols,begin_y,begin_x,h,w,alto_porc,ancho_porc);
+	
+	WINDOW* win = newwin(nlines, ncols, begin_y, begin_x);
+	keypad(win,TRUE);
+	box(win,0,0);
+
+	char* opciones[]={ // El primer elemento será el título del menú.
+		"Menú",
+		"Ejecutar servidor",
+		"Conectarse a servidor",
+	};
+	int len_menu=sizeof(opciones)/sizeof(opciones[0]); // Revisar si hay un error porque tomó el puntero como un array.
+
+	char loop=1; // Usé char en lugar de int porque char ocupa un solo byte de memoria, en cambio, un int normalmente 4.
+	short opcion=0;
+
+	while(loop){
+		short linea=1;
+		mvwprintw(win, linea++, (ncols-strlen(opciones[0]))/2, "%s", opciones[0]); 
+		// Las operaciones son para centrar el menú.
+
+		for (int i=1; i<len_menu; i++)
+			if (opcion==i-1) {
+				wattron(win, A_STANDOUT);
+				mvwprintw(win, ++linea, (centrado)?(ncols-strlen(opciones[i]))/2:1, "%s", opciones[i]);
+				wattroff(win, A_STANDOUT);
+			}
+			else 
+				mvwprintw(win, ++linea, (centrado)?(ncols-strlen(opciones[i]))/2:1, "%s", opciones[i]);
+		
+		int key=wgetch(win);
+
+		switch(key){
+			case KEY_UP:
+				opcion=(opcion)?opcion-1:len_menu-2;
+				break;
+
+			case KEY_DOWN:
+				opcion=(opcion==len_menu-2)?0:opcion+1;
+				break;
+			
+			case 'q':
+			case 'Q':
+			case '\33':
+				loop=0;
+				break;
+
+		}
+		/*
+		La siguiente función no es necesaria, pero se podrían hacer pruebas para el rendimiento después.
+		refresh();
+		*/
+
+	}
+	endwin();
+
+	return OK;
+}
