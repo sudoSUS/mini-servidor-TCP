@@ -61,3 +61,9 @@ Elección de nombre
 	Luego de guardar los cambios: se actualizará el nombre del usuario y se le enviará al menú de opciones; se guardará el nombre en el
 	archivo correspondiente sobreescribiendo el anterior.
 	
+	
+
+HACER una función de cada tipo con todos los parámetros que puedan usarse, luego definir macros más simples que necesiten menos argumentos.
+	Ejemplo:
+		Una función print con un parámetro adicional para decidir si irá centrado o no.
+			Se deriva la función printc en la que el texto irá centrado.

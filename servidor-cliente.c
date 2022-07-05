@@ -124,10 +124,9 @@ typedef struct{
 
 /*
 Imprimir adaptándose al número de columnas NCOLS.
-Centrado.
-La variable SEP indica qué tan separado estará de la orilla (se recomienda que sea al menos 1)
+La variable SEP indica qué tan separado estará de la orilla (se recomienda que sea al menos 1).
 */
-void printc(WINDOW* win, short* linea, short ncols, char* string, short sep){
+void _gen_print(WINDOW* win, short* linea, short ncols, char* string, short sep, short centrado){
 	if (sep<0) return; // Si la entrada es inválida, no imprime nada.
 
 	//short c=(ncols-strlen(string)%(ncols+1))/2+sep
@@ -141,25 +140,12 @@ void printc(WINDOW* win, short* linea, short ncols, char* string, short sep){
 	*/
 	
 	for (int i=0; i<len; i++){
-		if ((len-i <= len%ncols) && !(i%ncols)) wmove(win, *linea, (ncols+sep-len%(ncols+1))/2);
-		else if (! ( ((i+1)%(ncols-sep*2)) && i)) wmove(win, (*linea)++, sep);
-
-		wprintw(win, "%c", string[i]);
-	}
-	(*linea)++;
-	//mvwprintw(win, linea++, (ncols-strlen(usuario.nombre))/2, "%s", usuario.nombre);
-}
-
-/*
-Imprimir adaptándose al número de columnas NCOLS.
-Sin centrar.
-La variable SEP indica qué tan separado estará de la orilla (se recomienda que sea al menos 1)
-*/
-void print(WINDOW* win, short* linea, short ncols, char* string, short sep){
-	if (sep<0) return; // Si la entrada es inválida, no imprime nada.
-
-	for (int i=0; i<strlen(string); i++){
-		if (! ((i+1)%(ncols-sep))) wmove(win, (*linea)++, sep);
+		if ((len%(ncols-sep*2)==len-i)&&centrado) wmove(win, *linea, ncols/2-(len%(ncols-sep*2))/2);
+		else if (! ( i%(ncols-sep*2))) wmove(win, (*linea)++, sep);
+		/*
+		Error en el cálculo del centro.
+			Antes: ((ncols+sep-len%(ncols+1))/2)
+		*/
 
 		wprintw(win, "%c", string[i]);
 	}
@@ -174,7 +160,7 @@ El argumento CENTRADO define si las opciones estarán centradas o hacia la izqui
 	0: izquierda.
 	1: centro.
 */
-short menu_principal(float alto_porc, float ancho_porc, short centrado){
+short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titulo, short centrar_opcion, short sep_titulo, short sep_opcion){
 	/*
 	Notas:
 	Par de colores 1 para el nombre de usuario.
@@ -199,7 +185,7 @@ short menu_principal(float alto_porc, float ancho_porc, short centrado){
 	(centro_horiz-ancho_porc*w/2); 
 
 	//printw("Centro:%d - nlines:%d - ncols:%d - begin_y:%d - begin_x:%d - h:%d - w:%d - alt_por:%f - ancho_por:%f",centro_horiz,nlines,ncols,begin_y,begin_x,h,w,alto_porc,ancho_porc);
-	
+	nlines--, ncols--;
 	WINDOW* win = newwin(nlines, ncols, begin_y, begin_x);
 	keypad(win,TRUE);
 	box(win,0,0);
@@ -240,10 +226,12 @@ short menu_principal(float alto_porc, float ancho_porc, short centrado){
 		//mvwprintw(win, linea++, 1, "%s", opciones[0]);
 		if (color_has) {
 			wattron(win,COLOR_PAIR(1));
-			printc(win, &linea, ncols, usuario.nombre, 2);
+			if (centrar_titulo) printc(win, &linea, ncols, usuario.nombre, sep_titulo);
+			else print(win, &linea, ncols, usuario.nombre, sep_titulo);
 			wattroff(win,COLOR_PAIR(1));
 		}
-		else printc(win, &linea, ncols, usuario.nombre, 2);
+		else if (centrar_titulo) printc(win, &linea, ncols, usuario.nombre, sep_titulo);
+			else print(win, &linea, ncols, usuario.nombre, sep_titulo);
 		wmove(win, linea, 1);
 		linea+=2;
 		for (short i=0; i<ncols-2; i++)wprintw(win, "_"); // El separador.
@@ -251,13 +239,13 @@ short menu_principal(float alto_porc, float ancho_porc, short centrado){
 		for (int i=0; i<len_menu; i++){
 			if (opcion==i) {
 				wattron(win, A_STANDOUT);
-				if (centrado) printc(win,&linea,ncols,opciones[i],1);
+				if (centrar_opcion) printc(win,&linea,ncols,opciones[i],sep_opcion);
 				else print(win,&linea,ncols,opciones[i],1);
 				wattroff(win, A_STANDOUT);
 			}
 			else 
-				if (centrado) printc(win,&linea,ncols,opciones[i],1);
-				else print(win,&linea,ncols,opciones[i],1);
+				if (centrar_opcion) printc(win,&linea,ncols,opciones[i],sep_opcion);
+				else print(win,&linea,ncols,opciones[i],sep_opcion);
 
 			linea+=2;
 }
