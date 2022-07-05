@@ -39,3 +39,25 @@ Menú
 	
 	*A futuro
 		Hacer algo parecido a un recorrido de la pantalla cuando, al haber más opciones de las que se pueden mostrar en la pantalla, se quiera bajar más. Se imprimirán las opciones según la cantidad de líneas que se deban de bajar.
+
+
+Elección de nombre
+	Una estructura con:
+	un arreglo de un máximo MAXNOM (definido antes) de caracteres,
+	un arreglo de dos enteros cortos -el primero: foreground; el segundo: background.
+	
+	En el menú para elegir habrá arriba un texto como "Texto" que indicará cómo se verá el texto con la elección de colores.
+	Habrán dos filas: una indicando el color de la letra y una la de fondo; se podrá subir y bajar con las teclas de dirección.
+	Para cambiar el color, se usarán las teclas "Izquierda" y "Derecha".
+	Nota: Los colores parecen estar en orden (1,2,3...), por lo que puede aprovecharse.
+	Puede mostrarse el color que irá a la izquierda y a la derecha como una previsualización:
+		Background	rojo   AZUL  amarillo
+		(Lo anterior es solo un ejemplo).
+		La elección actual será la del centro, y las previsualizaciones tendrán un color más apagado.
+	
+	Se usará un botón para guardar los cambios y otro para salir.
+	Al intentar guardar los cambios se pedirá una confirmación: si se dice que no, solo se cerrará el mensaje de confirmación.
+	
+	Luego de guardar los cambios: se actualizará el nombre del usuario y se le enviará al menú de opciones; se guardará el nombre en el
+	archivo correspondiente sobreescribiendo el anterior.
+	
