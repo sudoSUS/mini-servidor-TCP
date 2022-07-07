@@ -76,7 +76,7 @@ short f_socket(int *sockfd, char* est){
 }
 
 void initservaddr(struct sockaddr_in *servaddr, char* IPv4, unsigned int puerto){
-	memset(servaddr, 0, sizeof(servaddr));
+	memset(servaddr, 0, sizeof(*servaddr));
 
 	servaddr->sin_family = AF_INET; // Familia IPv4.
 	servaddr->sin_addr.s_addr = inet_addr(IPv4); // Función de <arpa/inet.h>.
@@ -97,7 +97,7 @@ short f_listen(int sockfd, struct sockaddr_in servaddr, int maxClients, char* es
 		fprintf(stderr,"[%s-error]: estado de escucha fallido. %d: %s\n", est, errno, strerror(errno));
 		return -1;
 	}
-	printf("[%s]: escuchando en el SERV_PORT %d\n\n", ntohs(servaddr.sin_port));
+	printf("[%s]: escuchando en el SERV_PORT %d\n\n", est, ntohs(servaddr.sin_port));
 	return OK;
 }
 
@@ -108,7 +108,8 @@ Se retorna un file descriptor de un socket que permite la conección al cliente.
 Se guardan los datos del cliente en la estructura del parámetro CLIENT.
 */
 int f_accept(int sockfd, struct sockaddr_in *client){
-	int len = sizeof(*client), \
+	// Antes era: int len = sizeof(*client),
+	unsigned int len, \
 	conectionfd = accept(sockfd, (struct sockaddr*) client, &len);
 
 	return conectionfd;
@@ -204,7 +205,7 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 	}
 	
 	char color_has; // Almacenará si hay soporte para colores o no.
-	if (color_has=has_colors()){
+	if ((color_has=has_colors())){
 		start_color();
 		init_pair(1, usuario.c_pair[0], usuario.c_pair[1]);
 	}
