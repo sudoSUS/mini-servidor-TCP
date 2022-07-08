@@ -126,7 +126,7 @@ typedef struct{
 /*
 Imprimir adaptándose al número de columnas NCOLS.
 La variable SEP indica qué tan separado estará de la orilla (se recomienda que sea al menos 1).
-Variable centrado: 0 para no centrar; 1 para centrar dividiendo en palabras; 2 para centrar solo la última línea.
+Variable centrado: 0: no centrar (por palabras); 1: centrar (por palabras); 2: no centrar; 3: centrar (solo la última línea).
 */
 void _gen_print(WINDOW* win, short* linea, short ncols, char* string, short sep, short centrado){
 	if (sep<0) return; // Si la entrada es inválida, no imprime nada.
@@ -137,33 +137,40 @@ void _gen_print(WINDOW* win, short* linea, short ncols, char* string, short sep,
 		*/
 	//short c=(ncols-strlen(string)%(ncols+1))/2+sep
 	short len=strlen(string), capacidad=ncols-sep*2;
-	
-	if ((!centrado) || centrado==2) {
-		for (int i=0; i<len; i++){
-			if ((len%(capacidad)==len-i)&&centrado) wmove(win, *linea, (ncols-len%(ncols-2*sep))/2);
-			else if (! ( i%(capacidad))) wmove(win, (*linea)++, sep);
 
-			wprintw(win, "%c", string[i]);
-	}
-	(*linea)++;
-	}
+/* 
+Si hubiera problemas de optimización trabajando con grandes cantidades de texto, puede dividirse el código para cada 
+elección individualmente. Así se evita la evaluación de las sentencias if en cada iteración.
+*/
+	switch (centrado){ 
+		case 0:
+		case 1:
+			for (int fin=0, inicio=0; fin<len-1;){
+				if (len-fin < capacidad) fin = len-1;
+				else {
+					fin+=capacidad;
+					while (isalpha(string[fin]) && fin>inicio) fin--;
+					if (fin==inicio) fin+=capacidad;
+				}
 
-	else {
-		for (int fin=0, inicio=0; fin<len-1;){
-			if (len-fin < capacidad) fin = len-1;
-			else {
-				fin+=capacidad;
-				while (isalpha(string[fin]) && fin>inicio) fin--;
-				if (fin==inicio) fin+=capacidad;
+				while (isspace(string[fin]) && fin>inicio) fin--;
+				while (isspace(string[inicio]) && fin>inicio) inicio++;
+
+				wmove(win, (*linea)++, (centrado)? (ncols-fin+inicio)/2 : sep);
+				for (; inicio<=fin; inicio++) wprintw(win, "%c", string[inicio]);
 			}
+			break;
+		case 2:
+		case 3:
+			for (int i=0; i<len; i++){
+				if ((len%(capacidad)==len-i)&&centrado==3) wmove(win, *linea, (ncols-len%(ncols-2*sep))/2);
+				else if (! ( i%(capacidad))) wmove(win, (*linea)++, sep);
 
-			while (isspace(string[fin]) && fin>inicio) fin--;
-			while (isspace(string[inicio]) && fin>inicio) inicio++;
-
-			wmove(win, (*linea)++, (ncols-fin+inicio)/2);
-			for (; inicio<=fin; inicio++) wprintw(win, "%c", string[inicio]);
-		}
+				wprintw(win, "%c", string[i]);
+			}
+			(*linea)++;
 	}
+	
 }
 
 
@@ -239,12 +246,11 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 		//mvwprintw(win, linea++, 1, "%s", opciones[0]);
 		if (color_has) {
 			wattron(win,COLOR_PAIR(1));
-			if (centrar_titulo) printc(win, &linea, ncols, usuario.nombre, sep_titulo);
-			else print(win, &linea, ncols, usuario.nombre, sep_titulo);
+			_gen_print(win, &linea, ncols, usuario.nombre, sep_titulo, centrar_titulo);
 			wattroff(win,COLOR_PAIR(1));
 		}
-		else if (centrar_titulo) printc(win, &linea, ncols, usuario.nombre, sep_titulo);
-			else print(win, &linea, ncols, usuario.nombre, sep_titulo);
+		else _gen_print(win, &linea, ncols, usuario.nombre, sep_titulo, centrar_titulo);
+
 		wmove(win, linea, 1);
 		linea+=2;
 		for (short i=0; i<ncols-2; i++)wprintw(win, "_"); // El separador.
@@ -252,13 +258,12 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 		for (int i=0; i<len_menu; i++){
 			if (opcion==i) {
 				wattron(win, A_STANDOUT);
-				if (centrar_opcion) printc(win,&linea,ncols,opciones[i],sep_opcion);
-				else print(win,&linea,ncols,opciones[i],1);
+				_gen_print(win, &linea, ncols, opciones[i], sep_opcion, centrar_opcion);
 				wattroff(win, A_STANDOUT);
 			}
 			else 
-				if (centrar_opcion) printc(win,&linea,ncols,opciones[i],sep_opcion);
-				else print(win,&linea,ncols,opciones[i],sep_opcion);
+				_gen_print(win, &linea, ncols, opciones[i], sep_opcion, centrar_opcion);
+
 
 			linea+=2;
 }

@@ -2,7 +2,7 @@
 
 int main(){
     menu_principal(70, 40);
-    //_gen_menu_principal(50,20,0,1,2,1);
+    _gen_menu_principal(70,40,1,0,4,2);
 
     return 0;
 }
