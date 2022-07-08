@@ -126,32 +126,44 @@ typedef struct{
 /*
 Imprimir adaptándose al número de columnas NCOLS.
 La variable SEP indica qué tan separado estará de la orilla (se recomienda que sea al menos 1).
+Variable centrado: 0 para no centrar; 1 para centrar dividiendo en palabras; 2 para centrar solo la última línea.
 */
 void _gen_print(WINDOW* win, short* linea, short ncols, char* string, short sep, short centrado){
 	if (sep<0) return; // Si la entrada es inválida, no imprime nada.
 
-	//short c=(ncols-strlen(string)%(ncols+1))/2+sep
-	short len=strlen(string);
-	/*
-	#HACER
-		Hacer una función para eliminar los espacios en blanco repetidos, así como los del inicio y el final. (Creo que
-		había hecho antes una función de ese tipo en algún ejercicio).
-		Cuando haya un caracter en blanco al final o al inicio de la línea, este no debe incluirse ni en la cuenta
-		para posicionar el cursor ni en la impresión.
-	*/
-	
-	for (int i=0; i<len; i++){
-		if ((len%(ncols-sep*2)==len-i)&&centrado) wmove(win, *linea, ncols/2-(len%(ncols-sep*2))/2);
-		else if (! ( i%(ncols-sep*2))) wmove(win, (*linea)++, sep);
 		/*
 		Error en el cálculo del centro.
 			Antes: ((ncols+sep-len%(ncols+1))/2)
 		*/
+	//short c=(ncols-strlen(string)%(ncols+1))/2+sep
+	short len=strlen(string), capacidad=ncols-sep*2;
+	
+	if ((!centrado) || centrado==2) {
+		for (int i=0; i<len; i++){
+			if ((len%(capacidad)==len-i)&&centrado) wmove(win, *linea, (ncols-len%(ncols-2*sep))/2);
+			else if (! ( i%(capacidad))) wmove(win, (*linea)++, sep);
 
-		wprintw(win, "%c", string[i]);
+			wprintw(win, "%c", string[i]);
 	}
 	(*linea)++;
-	//mvwprintw(win, linea++, (ncols-strlen(usuario.nombre))/2, "%s", usuario.nombre);
+	}
+
+	else {
+		for (int fin=0, inicio=0; fin<len-1;){
+			if (len-fin < capacidad) fin = len-1;
+			else {
+				fin+=capacidad;
+				while (isalpha(string[fin]) && fin>inicio) fin--;
+				if (fin==inicio) fin+=capacidad;
+			}
+
+			while (isspace(string[fin]) && fin>inicio) fin--;
+			while (isspace(string[inicio]) && fin>inicio) inicio++;
+
+			wmove(win, (*linea)++, (ncols-fin+inicio)/2);
+			for (; inicio<=fin; inicio++) wprintw(win, "%c", string[inicio]);
+		}
+	}
 }
 
 
