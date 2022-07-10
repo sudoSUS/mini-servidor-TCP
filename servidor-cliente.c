@@ -150,7 +150,7 @@ elección individualmente. Así se evita la evaluación de las sentencias if en 
 				else {
 					fin+=capacidad;
 					while (isalpha(string[fin]) && fin>inicio) fin--;
-					if (fin==inicio) fin+=capacidad;
+					if (fin==inicio) fin+=capacidad-1;
 				}
 
 				while (isspace(string[fin]) && fin>inicio) fin--;
@@ -173,13 +173,155 @@ elección individualmente. Así se evita la evaluación de las sentencias if en 
 	
 }
 
+/*
+Para realizar una entrada en la posición Y, X.
+Cuando la cantidad de caracteres introducidos rebase las columnas permitidas, se "recorrerá" el texto usando un carácter '<',
+como sucede en el editor Nano.
+*/
+void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer){
+	
+}
+
+void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
+	short c_pair[2], opcion=0, linea, nopciones=4;
+	bool colors_has=has_colors();
+	char nombre[MAXNOM], loop=1; strcpy(nombre, usuario->nombre);
+	c_pair[0]=usuario->c_pair[0], c_pair[1]=usuario->c_pair[1];
+
+	while (loop){
+		werase(win); 
+		box(win, 0, 0);
+		linea=1;
+		if (colors_has){
+			init_pair(2, c_pair[0], c_pair[1]);
+			wattron(win, COLOR_PAIR(2));
+			_gen_print(win, &linea, ncols, nombre, 4, 1);
+			wattroff(win, COLOR_PAIR(2));
+
+			for (short i=0; i<=COLOR_WHITE; i++) init_pair(i+3, 0, i);
+
+			linea+=2;
+			for (short i=0, pair; i<2; i++){
+				wattron(win, A_BOLD | A_UNDERLINE | WA_LEFT);
+				_gen_print(win, &linea, ncols, (i)? "Background:":"Foreground:", 4, 1);
+				wattroff(win, A_BOLD | A_UNDERLINE | WA_LEFT);
+
+
+				pair= (c_pair[i])? c_pair[i]+2 : 10;
+				wattron(win, COLOR_PAIR(pair));
+				mvwprintw(win, linea, ncols/2-3, " ");
+				wattroff(win, COLOR_PAIR(pair)); 
+
+				pair= c_pair[i]+3;
+				wattron(win, COLOR_PAIR(pair));
+				mvwprintw(win, linea, ncols/2-1, "   ");
+				wattroff(win, COLOR_PAIR(pair));
+
+				pair= (c_pair[i]+1)%COLOR_WHITE +3;
+				wattron(win, COLOR_PAIR(pair));
+				mvwprintw(win, linea, ncols/2+3, " ");
+				wattroff(win, COLOR_PAIR(pair));
+
+				linea+=2;
+			}
+
+			wattron(win, A_UNDERLINE| A_BLINK | A_BOLD);
+			_gen_print(win,&linea,ncols,"Guardar",4,1);
+			wattroff(win, A_UNDERLINE| A_BLINK | A_BOLD);
+			linea+=2;
+
+			wattron(win, A_STANDOUT);
+			mvwprintw(win, opcion*3+1, ncols-3, "*");
+			wattroff(win, A_STANDOUT);
+
+			switch(wgetch(win)) {
+				case KEY_UP:
+					opcion=(opcion)?opcion-1: nopciones-1;
+					break;
+				case KEY_DOWN:
+					opcion=(opcion+1)%nopciones;
+					break;
+				case 'q':
+				case 'Q':
+				case '\33':
+					loop=0;
+					break;
+				
+				case KEY_LEFT:
+					switch(opcion) {
+						case 0:
+							entrada_larga(win, 1, 2, ncols-4, nombre);
+							break;
+						case 1:
+						case 2:
+							short* ptcolor=c_pair+opcion-1;
+							*ptcolor= (*ptcolor)?(*ptcolor)-1:COLOR_WHITE;
+							break;
+					}
+					break;
+				case KEY_RIGHT:
+					switch(opcion) {
+						case 0:
+							entrada_larga(win, 1, 2, ncols-4, nombre);
+							break;
+						case 1:
+						case 2:
+							short* ptcolor=c_pair+opcion-1;
+							*ptcolor= ((*ptcolor)+1)%8;
+							break;
+					}
+					break;
+				case '\n':
+				case ' ':
+					switch(opcion){
+						case 3:
+							wattron(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
+							_gen_print(win,&linea,ncols,"¿Desea guardar los cambios? (S/N)",2,1);
+							wattroff(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
+							short key;
+
+							do{
+								key=tolower(wgetch(win));
+							} while (key!='s' && key!='n');
+							
+							if (key=='s') {
+								strcpy(usuario->nombre, nombre);
+								usuario->c_pair[0]=c_pair[0];
+								usuario->c_pair[1]=c_pair[1];
+								FILE* fuser;
+								if ((fuser=fopen(".user.data","wb"))!=NULL){
+									int size_write;
+									size_write=fwrite(usuario, sizeof(*usuario), 1, fuser);
+									if (size_write!=sizeof(*usuario)){
+										werase(win);
+										wprintw(win, "Error al guardar en el archivo.");
+									}
+									loop=0;
+								}
+
+							}
+					}
+					break;
+			}
+		
+		}
+	}
+
+}
+
+
 
 /*
-Los argumentos que se reciben son el porcentaje de la pantalla que usará la ventana del menú.
-El argumento CENTRADO define si las opciones estarán centradas o hacia la izquierda:
-	0: izquierda.
-	1: centro.
-*/
+Los dos primeros argumentos definen el porcentaje de alto y ancho que el menú ocupará.
+
+El argumento CENTRADO_<PARTE> define si las opciones estarán centradas o no:
+	0: no centrado (por palabras);
+	1: centrado (por palabras);
+	2: no centrado;
+	3: centrado.
+
+El argumento SEP_<PARTE> define la separación de la parte con el borde.
+*/	
 short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titulo, short centrar_opcion, short sep_titulo, short sep_opcion){
 	/*
 	Notas:
@@ -208,7 +350,6 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 	nlines--, ncols--;
 	WINDOW* win = newwin(nlines, ncols, begin_y, begin_x);
 	keypad(win,TRUE);
-	box(win,0,0);
 
 	// Comprobar si hay un usuario guardado.
 	FILE* fuser=fopen(".user.data", "rb");
@@ -233,7 +374,7 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 		//"Bienvenido: ",
 		"Ejecutar servidor",
 		"Conectarse a servidor",
-		"Elemento muy largo de prueba. Largo, pero pero pero muy largo."
+		"Personalizar nombre de usuario",
 	};
 	int len_menu=sizeof(opciones)/sizeof(opciones[0]); // Revisar si hay un error porque tomó el puntero como un array.
 
@@ -241,6 +382,7 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 	short opcion=0;
 
 	while(loop){
+		box(win,0,0);
 		short linea=1;
 		// Las operaciones son para centrar el título.
 		//mvwprintw(win, linea++, 1, "%s", opciones[0]);
@@ -284,12 +426,27 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 				loop=0;
 				break;
 
+			case '\n':
+			case ' ':
+				switch (opcion){
+					case 0:
+						break;
+					case 1:
+						break;
+					case 2:
+						personalizar_usuario(win, &usuario, ncols);
+						init_pair(1, usuario.c_pair[0], usuario.c_pair[1]);
+						break;
+
+
+				}
+				werase(win);
+				break;
 		}
 		/*
 		La siguiente función no es necesaria, pero se podrían hacer pruebas para el rendimiento después.
 		refresh();
 		*/
-
 	}
 	endwin();
 
