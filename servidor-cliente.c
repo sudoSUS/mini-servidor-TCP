@@ -13,7 +13,7 @@
 #include<arpa/inet.h>
 
 
-#define MAXNOM 20
+#define MAXNOM 50
 
 
 // Guarda la IP local en la dirección del argumento.
@@ -178,21 +178,76 @@ Para realizar una entrada en la posición Y, X.
 Cuando la cantidad de caracteres introducidos rebase las columnas permitidas, se "recorrerá" el texto usando un carácter '<',
 como sucede en el editor Nano.
 */
-void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer){
-	
+void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsigned int size){
+	char temp[size--]; temp[0]='\0';
+	bool loop=1;
+	wmove(win, y, x);
+	for (short i=0; i<cols; i++) wprintw(win, " ");
+	int caracteres=0, key, i, c, j; // Las tres últimas variables son para los bucles.
+	wmove(win, y, x);
+	curs_set(1);
+
+	while (loop) {
+		key=wgetch(win);
+
+		if (isprint(key)){
+			if (caracteres<size){
+				if ((!(caracteres%((cols<caracteres)?cols-1:cols))) && caracteres) {
+					wmove(win, y, x+1);
+					for (short i=1; i<cols; i++) wprintw(win, " ");
+					wmove(win, y, x);
+					wattron(win, A_STANDOUT);
+					wprintw(win, "<");
+					wattroff(win, A_STANDOUT);
+				}
+				temp[caracteres++]=key;
+				temp[caracteres]='\0';
+				wprintw(win,"%c",key);
+			}
+		}
+		else switch(key){
+			case KEY_BACKSPACE:
+				if (caracteres) {
+					temp[--caracteres]='\0';
+					if ((!(caracteres%((cols<caracteres)?cols-1:cols))) && caracteres) {
+						mvwprintw(win, y, x, "%s", (char*)(temp+(caracteres-cols-(caracteres>cols)?-1:0)));
+					}
+					else{
+						mvwprintw(win,y, x+caracteres%(cols), " ");
+						wmove(win, y, x+caracteres%(cols));
+					}
+				}
+				break;
+			case '\33':
+			case '\n':
+				for (i=0; isspace(temp[i]); i++);
+				for (c=strlen(temp)-1; isspace(temp[c])&&c; c--);
+				for (j=0; i<=c; j++, i++) temp[j]=temp[i];
+				temp[j]='\0';
+				if (strlen(temp)){
+					strcpy(buffer, temp);
+					loop=0;
+				}
+				break;
+		}
+	}
+
+	curs_set(0);
 }
 
 void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
-	short c_pair[2], opcion=0, linea, nopciones=4;
-	bool colors_has=has_colors();
-	char nombre[MAXNOM], loop=1; strcpy(nombre, usuario->nombre);
+	short c_pair[2], opcion=0, linea, nopciones=4, posOpciones[nopciones];
+	bool colors_has=has_colors(), cambios;
+	char nombre[MAXNOM+1], loop=1; strcpy(nombre, usuario->nombre);
 	c_pair[0]=usuario->c_pair[0], c_pair[1]=usuario->c_pair[1];
 
 	while (loop){
 		werase(win); 
 		box(win, 0, 0);
 		linea=1;
+		cambios=strcmp(usuario->nombre,nombre) || usuario->c_pair[0]!=c_pair[0] || usuario->c_pair[1]!=c_pair[1];
 		if (colors_has){
+			posOpciones[0]=linea;
 			init_pair(2, c_pair[0], c_pair[1]);
 			wattron(win, COLOR_PAIR(2));
 			_gen_print(win, &linea, ncols, nombre, 4, 1);
@@ -202,6 +257,7 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 
 			linea+=2;
 			for (short i=0, pair; i<2; i++){
+				posOpciones[1+i]=linea;
 				wattron(win, A_BOLD | A_UNDERLINE | WA_LEFT);
 				_gen_print(win, &linea, ncols, (i)? "Background:":"Foreground:", 4, 1);
 				wattroff(win, A_BOLD | A_UNDERLINE | WA_LEFT);
@@ -209,30 +265,31 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 
 				pair= (c_pair[i])? c_pair[i]+2 : 10;
 				wattron(win, COLOR_PAIR(pair));
-				mvwprintw(win, linea, ncols/2-3, " ");
+				mvwprintw(win, linea, ncols/2-2, " ");
 				wattroff(win, COLOR_PAIR(pair)); 
 
 				pair= c_pair[i]+3;
 				wattron(win, COLOR_PAIR(pair));
-				mvwprintw(win, linea, ncols/2-1, "   ");
+				wprintw(win,"   ");
 				wattroff(win, COLOR_PAIR(pair));
 
 				pair= (c_pair[i]+1)%COLOR_WHITE +3;
 				wattron(win, COLOR_PAIR(pair));
-				mvwprintw(win, linea, ncols/2+3, " ");
+				wprintw(win," ");
 				wattroff(win, COLOR_PAIR(pair));
 
 				linea+=2;
 			}
 
-			wattron(win, A_UNDERLINE| A_BLINK | A_BOLD);
+			posOpciones[3]=linea;
+			wattron(win, A_UNDERLINE| ((cambios)?A_BLINK:0) | A_BOLD);
 			_gen_print(win,&linea,ncols,"Guardar",4,1);
-			wattroff(win, A_UNDERLINE| A_BLINK | A_BOLD);
-			linea+=2;
+			wattroff(win, A_UNDERLINE| ((cambios)?A_BLINK:0) | A_BOLD);
+			linea++;
 
-			wattron(win, A_STANDOUT);
-			mvwprintw(win, opcion*3+1, ncols-3, "*");
-			wattroff(win, A_STANDOUT);
+			wattron(win, A_STANDOUT | A_BLINK);
+			mvwprintw(win, posOpciones[opcion], ncols-3, "*");
+			wattroff(win, A_STANDOUT | A_BLINK);
 
 			switch(wgetch(win)) {
 				case KEY_UP:
@@ -244,13 +301,25 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 				case 'q':
 				case 'Q':
 				case '\33':
-					loop=0;
+					if (cambios){
+						wattron(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
+						_gen_print(win,&linea,ncols,"¿Desea salir sin guardar los cambios? (S/N)",2,1);
+						wattroff(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
+						short key;
+						do{
+							key=tolower(wgetch(win));
+						} while (key!='s' && key!='n');
+
+						if (key=='s')
+							loop=0;
+					}
+					else loop=0;
 					break;
 				
 				case KEY_LEFT:
 					switch(opcion) {
 						case 0:
-							entrada_larga(win, 1, 2, ncols-4, nombre);
+							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1);
 							break;
 						case 1:
 						case 2:
@@ -262,7 +331,7 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 				case KEY_RIGHT:
 					switch(opcion) {
 						case 0:
-							entrada_larga(win, 1, 2, ncols-4, nombre);
+							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1);
 							break;
 						case 1:
 						case 2:
@@ -275,38 +344,52 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 				case ' ':
 					switch(opcion){
 						case 3:
-							wattron(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
-							_gen_print(win,&linea,ncols,"¿Desea guardar los cambios? (S/N)",2,1);
-							wattroff(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
-							short key;
+							if (cambios) {
+								wattron(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
+								_gen_print(win,&linea,ncols,"¿Desea guardar los cambios? (S/N)",2,1);
+								wattroff(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
+								short key;
 
-							do{
-								key=tolower(wgetch(win));
-							} while (key!='s' && key!='n');
-							
-							if (key=='s') {
-								strcpy(usuario->nombre, nombre);
-								usuario->c_pair[0]=c_pair[0];
-								usuario->c_pair[1]=c_pair[1];
-								FILE* fuser;
-								if ((fuser=fopen(".user.data","wb"))!=NULL){
-									int size_write;
-									size_write=fwrite(usuario, sizeof(*usuario), 1, fuser);
-									if (size_write!=sizeof(*usuario)){
-										werase(win);
-										wprintw(win, "Error al guardar en el archivo.");
+								do{
+									key=tolower(wgetch(win));
+								} while (key!='s' && key!='n');
+								
+								if (key=='s') {
+									strcpy(usuario->nombre, nombre);
+									usuario->c_pair[0]=c_pair[0];
+									usuario->c_pair[1]=c_pair[1];
+									FILE* fuser;
+									if ((fuser=fopen(".user.data","wb"))!=NULL){
+										int size_write;
+										size_write=fwrite(usuario, sizeof(*usuario), 1, fuser);
+										if (size_write!=sizeof(*usuario)){
+											werase(win);
+											wprintw(win, "Error al guardar en el archivo.");
+										}
+										loop=0;
 									}
-									loop=0;
 								}
-
 							}
+							else {
+								wattron(win, A_UNDERLINE);
+								_gen_print(win,&linea,ncols,"No se han realizado cambios.",2,1);
+								_gen_print(win,&linea,ncols,"Presiona una tecla para continuar...",2,1);
+								wattroff(win, A_UNDERLINE);
+								wgetch(win);
+							}
+							break;
+						case 0:
+							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1);
+							break;
 					}
 					break;
+				default:
+					if (!opcion) entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1);
 			}
 		
 		}
 	}
-
+	werase(win); ////// No parece funcionar.
 }
 
 
