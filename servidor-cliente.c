@@ -213,8 +213,8 @@ void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsign
 						mvwprintw(win, y, x, "%s", (char*)(temp+(caracteres-cols-(caracteres>cols)?-1:0)));
 					}
 					else{
-						mvwprintw(win,y, x+caracteres%(cols), " ");
-						wmove(win, y, x+caracteres%(cols));
+						mvwprintw(win, y, x+caracteres%cols+((cols<caracteres)?1:0), " ");
+						wmove(win, y, x+caracteres%cols+((cols<caracteres)?1:0));
 					}
 				}
 				break;
