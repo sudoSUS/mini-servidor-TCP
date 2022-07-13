@@ -13,8 +13,6 @@
 #include<arpa/inet.h>
 
 
-#define MAXNOM 50
-
 
 // Guarda la IP local en la dirección del argumento.
 int gethostip(char *hostip)
@@ -116,13 +114,6 @@ int f_accept(int sockfd, struct sockaddr_in *client){
 
 }
 
-// Estructura describiendo un usuario y los colores a usar.
-typedef struct{
-	char nombre[MAXNOM+1];
-	short c_pair[2]; // Para el para de colores.
-	
-} t_usuario;
-
 /*
 Imprimir adaptándose al número de columnas NCOLS.
 La variable SEP indica qué tan separado estará de la orilla (se recomienda que sea al menos 1).
@@ -136,16 +127,19 @@ void _gen_print(WINDOW* win, short* linea, short ncols, char* string, short sep,
 			Antes: ((ncols+sep-len%(ncols+1))/2)
 		*/
 	//short c=(ncols-strlen(string)%(ncols+1))/2+sep
-	short len=strlen(string), capacidad=ncols-sep*2;
+	short len=strlen(string), capacidad=ncols-sep*2, uno=0;
+	if (len==1) uno=1;
 
 /* 
 Si hubiera problemas de optimización trabajando con grandes cantidades de texto, puede dividirse el código para cada 
 elección individualmente. Así se evita la evaluación de las sentencias if en cada iteración.
+El uso de la variable "uno" es una solución temporal para imprimir un solo carácter. Buscar a futuro una solución más
+eficiente.
 */
 	switch (centrado){ 
 		case 0:
 		case 1:
-			for (int fin=0, inicio=0; fin<len-1;){
+			for (int fin=0, inicio=0; fin<len-1 || (uno--)==1;){
 				if (len-fin < capacidad) fin = len-1;
 				else {
 					fin+=capacidad;
@@ -192,7 +186,7 @@ void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsign
 
 		if (isprint(key)){
 			if (caracteres<size){
-				if ((!(caracteres%((cols<caracteres)?cols-1:cols))) && caracteres) {
+				if ((!(caracteres>cols? (caracteres-1)%(cols-1) : caracteres%cols)) && caracteres) {
 					wmove(win, y, x+1);
 					for (short i=1; i<cols; i++) wprintw(win, " ");
 					wmove(win, y, x);
@@ -209,25 +203,35 @@ void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsign
 			case KEY_BACKSPACE:
 				if (caracteres) {
 					temp[--caracteres]='\0';
-					if ((!(caracteres%((cols<caracteres)?cols-1:cols))) && caracteres) {
-						mvwprintw(win, y, x, "%s", (char*)(temp+(caracteres-cols-(caracteres>cols)?-1:0)));
+					// Agregar más conficiones para cuando caracteres>cols, aquí y en agregar caracteres.
+					if ((!(caracteres>cols? (caracteres-1)%(cols-1) : caracteres%cols)) && caracteres) {
+						if(caracteres>cols){
+							wmove(win, y, x);
+							wattron(win, A_STANDOUT);
+							wprintw(win, "<");
+							wattroff(win, A_STANDOUT);
+							wprintw(win,"%s",(char*)(temp+caracteres-cols+1));
+						}
+						else
+							mvwprintw(win, y, x, "%s", temp);
 					}
 					else{
-						mvwprintw(win, y, x+caracteres%cols+((cols<caracteres)?1:0), " ");
-						wmove(win, y, x+caracteres%cols+((cols<caracteres)?1:0));
+						mvwprintw(win, y, x+(caracteres>cols? (caracteres-cols)%(cols-1)+1: caracteres), " ");
+						wmove(win, y, x+(caracteres>cols? (caracteres-cols)%(cols-1)+1: caracteres));
 					}
 				}
 				break;
 			case '\33':
 			case '\n':
 				for (i=0; isspace(temp[i]); i++);
-				for (c=strlen(temp)-1; isspace(temp[c])&&c; c--);
+				for (c=strlen(temp)-1; isspace(temp[c]); c--);
 				for (j=0; i<=c; j++, i++) temp[j]=temp[i];
 				temp[j]='\0';
-				if (strlen(temp)){
+				caracteres=strlen(temp);
+				if (caracteres){
 					strcpy(buffer, temp);
-					loop=0;
-				}
+				} else strcpy(temp, buffer);
+				loop=0;
 				break;
 		}
 	}
