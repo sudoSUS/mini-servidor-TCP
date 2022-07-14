@@ -11,6 +11,7 @@
 #include<ifaddrs.h>
 #include<netdb.h>
 
+
 #include<arpa/inet.h>
 
 
@@ -80,10 +81,8 @@ Segundo argumento: Tipo de socket TCP (servidor o cliente).
 */
 short f_socket(int *sockfd, char* est){ 
 	if((*sockfd = socket(AF_INET, SOCK_STREAM, 0))==-1){
-		fprintf(stderr, "[%s-error]: creación del socket fallida. %d: %s\n",est,errno, strerror(errno));
 		return -1;
 	}
-	printf("[%s]: socket creado satisfactoriamente.\n",est);
 	return OK;
 }
 
@@ -96,20 +95,16 @@ void initservaddr(struct sockaddr_in *servaddr, char* IPv4, unsigned int puerto)
 }
 
 short f_bind(int sockfd, struct sockaddr_in *servaddr, char* est){
-	if((bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))) != 0) {
-		fprintf(stderr, "[%s-error]: llamada bind fallida. %d: %s\n", est, errno, strerror(errno));
+	if((bind(sockfd, (struct sockaddr*)servaddr, sizeof(*servaddr))) != 0) {
 		return -1;
 	}
-	printf("[%s]: llamada bind realizada satisfactoriamente.\n",est);
 	return OK;
 }
 
 short f_listen(int sockfd, struct sockaddr_in servaddr, int maxClients, char* est){
 	if ((listen(sockfd, maxClients)) != 0) {
-		fprintf(stderr,"[%s-error]: estado de escucha fallido. %d: %s\n", est, errno, strerror(errno));
 		return -1;
 	}
-	printf("[%s]: escuchando en el SERV_PORT %d\n\n", est, ntohs(servaddr.sin_port));
 	return OK;
 }
 
@@ -122,9 +117,9 @@ Se guardan los datos del cliente en la estructura del parámetro CLIENT.
 int f_accept(int sockfd, struct sockaddr_in *client){
 	// Antes era: int len = sizeof(*client),
 	unsigned int len, \
-	conectionfd = accept(sockfd, (struct sockaddr*) client, &len);
+	connectionfd = accept(sockfd, (struct sockaddr*) client, &len);
 
-	return conectionfd;
+	return connectionfd;
 
 }
 
@@ -216,6 +211,7 @@ void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsign
 		}
 		else switch(key){
 			case KEY_BACKSPACE:
+			case 127: // Tecla para eliminar en Android.
 				if (caracteres) {
 					temp[--caracteres]='\0';
 					// Agregar más conficiones para cuando caracteres>cols, aquí y en agregar caracteres.
@@ -418,9 +414,11 @@ int puntumero(int caracter){
 }
 
 void servidor(WINDOW* win, t_usuario usuario, int ncols) {
-	int sockfd; // File descriptor para el socket del servidor.
-	short loop=1, opcion=0, linea, key, nopciones=2, posOpciones[nopciones];
-	char ip[16], puerto[6]="8000";
+	int sockfd, connectionfd; // File descriptor para el socket del servidor.
+	struct sockaddr_in servaddr, client;
+
+	short loop=1, opcion=0, linea, key;
+	char ip[16], puerto[6]="8000", maxClients[4]="10", ip_puerto[21];
 	gethostip(ip);
 
 	struct {
@@ -428,9 +426,10 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 		char* valor_opcion;
 	} opciones[] = {
 		{"IP", ip,},
-		{"Puerto", puerto,}
+		{"Puerto", puerto,},
+		{"Clientes en espera",maxClients},
 	};
-	short len_opciones=sizeof(opciones)/sizeof(opciones[0]);
+	short len_opciones=sizeof(opciones)/sizeof(opciones[0]), posOpciones[len_opciones];
 
 	curs_set(1);
 
@@ -479,10 +478,10 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 				break;
 			
 			case KEY_UP:
-				opcion=(opcion)?opcion-1: nopciones-1;
+				opcion=(opcion)?opcion-1: len_opciones-1;
 				break;
 			case KEY_DOWN:
-				opcion=(opcion+1)%nopciones;
+				opcion=(opcion+1)%len_opciones;
 				break;
 			
 			case '\n':
@@ -492,8 +491,53 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 				wattron(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
 				_gen_print(win,&linea,ncols,"¿Iniciar servidor? (S/N)",2,1);
 				wattroff(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
-				if (tolower(wgetch(win))=='s')
-					; ///////// AQUÍ FUNCIÓN PARA EL CHAT (usar strtol para el puerto). Podría hacerse loop=0 también.
+				if (tolower(wgetch(win))=='s') {
+					werase(win); linea=1;
+					box(win, 0, 0);
+					
+					if (f_socket(&sockfd, ser)==-1) {
+						_gen_print(win,&linea,ncols, "[SERVER-error]: creación del socket fallida.", 2, 0);
+						wgetch(win);
+						loop=0;
+					}
+					else _gen_print(win,&linea,ncols, "[SERVER]: socket creado satisfactoriamente.", 2, 0);
+					linea++;
+
+					initservaddr(&servaddr, opciones[0].valor_opcion, strtol(opciones[1].valor_opcion, NULL, 10));
+
+					if (f_bind(sockfd, &servaddr, ser)==-1){
+						_gen_print(win,&linea,ncols, "[SERVER-error]: llamada bind fallida.", 2, 0);
+						wgetch(win);
+						loop=0;
+					}
+					else _gen_print(win,&linea,ncols, "[SERVER]: llamada bind realizada satisfactoriamente.", 2, 0);
+					linea++;
+					
+					if (f_listen(sockfd, servaddr, strtol(opciones[2].valor_opcion, NULL, 10), ser)==-1){
+						_gen_print(win,&linea,ncols, "[SERVER-error]: estado de escucha fallido.", 2, 0);
+						wgetch(win);
+						loop=0;
+					}
+					else _gen_print(win,&linea,ncols, "[SERVER]: en estado de escucha.", 2, 0);
+					linea++;
+
+					sprintf(ip_puerto, "%s:%s", opciones[0].valor_opcion, opciones[1].valor_opcion);
+					
+					wattron(win, COLOR_PAIR(2));
+					_gen_print(win, &linea, ncols, usuario.nombre, 4, 1);
+					wattroff(win, COLOR_PAIR(2));
+					linea++;
+
+					wattron(win, A_BOLD | A_BLINK);
+					_gen_print(win,&linea,ncols,"A la escucha en:",4,1);
+					wattroff(win, A_BOLD | A_BLINK);
+					_gen_print(win,&linea,ncols,ip_puerto,4,1);
+
+					wrefresh(win);
+					
+					connectionfd=f_accept(sockfd, &client);
+					///////// AQUÍ FUNCIÓN PARA EL CHAT (usar strtol para el puerto). Podría hacerse loop=0 también.
+				}
 				else curs_set(1);
 				break;
 			
@@ -505,6 +549,9 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 					break;
 				case 1:
 					entrada_larga(win, posOpciones[1]+1, ncols/2-3, 6, opciones[1].valor_opcion, 6, isdigit);
+					break;
+				case 2:
+					entrada_larga(win, posOpciones[2]+1, ncols/2-1, 3, opciones[2].valor_opcion, 4, isdigit);
 					break;
 				}
 				curs_set(1);
