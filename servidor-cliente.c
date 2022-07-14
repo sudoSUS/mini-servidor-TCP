@@ -255,7 +255,7 @@ void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsign
 }
 
 void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
-	short c_pair[2], opcion=0, linea, nopciones=4, posOpciones[nopciones];
+	short c_pair[2], opcion=0, linea, nopciones=4, posOpciones[nopciones], *ptcolor;
 	bool colors_has=has_colors(), cambios;
 	char nombre[MAXNOM+1], loop=1; strcpy(nombre, usuario->nombre);
 	c_pair[0]=usuario->c_pair[0], c_pair[1]=usuario->c_pair[1];
@@ -342,7 +342,7 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 							break;
 						case 1:
 						case 2:
-							short* ptcolor=c_pair+opcion-1;
+							ptcolor=c_pair+opcion-1;
 							*ptcolor= (*ptcolor)?(*ptcolor)-1:COLOR_WHITE;
 							break;
 					}
@@ -354,7 +354,7 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 							break;
 						case 1:
 						case 2:
-							short* ptcolor=c_pair+opcion-1;
+							ptcolor=c_pair+opcion-1;
 							*ptcolor= ((*ptcolor)+1)%8;
 							break;
 					}
