@@ -23,7 +23,7 @@ short f_listen(int, struct sockaddr_in, int, char*);
 int f_accept(int, struct sockaddr_in *);
 short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titulo, short centrar_opcion, short sep_titulo, short sep_opcion);
 void _gen_print(WINDOW* win, short* linea, short ncols, char* string, short sep, short centrado);
-void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsigned int size);
+void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsigned int size, int (*verfunc)(int));
 void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols);
 
 #define menu_principal(alto_porc, ancho_porc) (_gen_menu_principal(alto_porc, ancho_porc, 1, 1, 4, 2))

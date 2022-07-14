@@ -4,6 +4,7 @@
 #include<string.h>
 #include<ctype.h>
 #include<errno.h>
+#include<stdlib.h>
 
 #include<ncurses.h>
 
@@ -48,6 +49,19 @@ int gethostip(char *hostip)
 		}
 	}
 	return ( -1 );
+}
+
+/*
+Eleva N1 a la potencia N2
+*/
+float pot(int n1, int n2){
+	if (!n1) return 0;
+	if (!n2) return 1;
+	float res=1;
+	if (n2>0)
+		for (; n2; n2--) res*=n1;
+	else for (; n2; n2++) res/=n1;
+	return res;
 }
 
 /*
@@ -172,7 +186,8 @@ Para realizar una entrada en la posición Y, X.
 Cuando la cantidad de caracteres introducidos rebase las columnas permitidas, se "recorrerá" el texto usando un carácter '<',
 como sucede en el editor Nano.
 */
-void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsigned int size){
+void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsigned int size, int (*verfunc) (int)){
+	if (verfunc==NULL) verfunc=isprint;
 	char temp[size--]; temp[0]='\0';
 	bool loop=1;
 	wmove(win, y, x);
@@ -184,7 +199,7 @@ void entrada_larga(WINDOW* win, short y, short x, int cols, char* buffer, unsign
 	while (loop) {
 		key=wgetch(win);
 
-		if (isprint(key)){
+		if (verfunc(key)){
 			if (caracteres<size){
 				if ((!(caracteres>cols? (caracteres-1)%(cols-1) : caracteres%cols)) && caracteres) {
 					wmove(win, y, x+1);
@@ -323,7 +338,7 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 				case KEY_LEFT:
 					switch(opcion) {
 						case 0:
-							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1);
+							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1, NULL);
 							break;
 						case 1:
 						case 2:
@@ -335,7 +350,7 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 				case KEY_RIGHT:
 					switch(opcion) {
 						case 0:
-							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1);
+							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1, NULL);
 							break;
 						case 1:
 						case 2:
@@ -383,12 +398,12 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 							}
 							break;
 						case 0:
-							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1);
+							entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1, NULL);
 							break;
 					}
 					break;
 				default:
-					if (!opcion) entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1);
+					if (!opcion) entrada_larga(win, 1, 2, ncols-4, nombre, MAXNOM+1, NULL);
 			}
 		
 		}
@@ -396,7 +411,113 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 	werase(win); ////// No parece funcionar.
 }
 
+// Retorna 1 si el argumento es un número o un punto; 0 de lo contrario.
+int puntumero(int caracter){
+	if (isdigit(caracter)||caracter=='.') return 1;
+	return 0;
+}
 
+void servidor(WINDOW* win, t_usuario usuario, int ncols) {
+	int sockfd; // File descriptor para el socket del servidor.
+	short loop=1, opcion=0, linea, key, nopciones=2, posOpciones[nopciones];
+	char ip[16], puerto[6]="8000";
+	gethostip(ip);
+
+	struct {
+		char* nombre_opcion;
+		char* valor_opcion;
+	} opciones[] = {
+		{"IP", ip,},
+		{"Puerto", puerto,}
+	};
+	short len_opciones=sizeof(opciones)/sizeof(opciones[0]);
+
+	curs_set(1);
+
+	while (loop){
+		werase(win);
+		linea=1;
+		box(win, 0, 0);
+
+		init_pair(2, usuario.c_pair[0], usuario.c_pair[1]);
+		wattron(win, COLOR_PAIR(2));
+		_gen_print(win, &linea, ncols, usuario.nombre, 4, 1);
+		wattroff(win, COLOR_PAIR(2));
+		linea++;
+
+		wattron(win, A_BOLD);
+		_gen_print(win, &linea, ncols, "Configuración del servidor", 2, 1);
+		wattroff(win, A_BOLD);
+		linea++;
+
+		for (short i=0; i<len_opciones; i++){
+			posOpciones[i]=linea;
+			wattron(win, A_UNDERLINE);
+			_gen_print(win, &linea, ncols, opciones[i].nombre_opcion, 4, 1);
+			wattroff(win, A_UNDERLINE);
+
+			wattron(win, A_ITALIC);
+			_gen_print(win, &linea, ncols, opciones[i].valor_opcion, 4, 1);
+			wattroff(win, A_ITALIC);
+
+			linea++;
+		}
+
+		linea++;
+		wattron(win, A_BLINK | A_DIM);
+		_gen_print(win, &linea, ncols, "Enter para continuar...", 2, 1);
+		wattroff(win, A_BLINK | A_DIM);
+
+		mvwprintw(win, posOpciones[opcion], ncols-3, "*");
+		wmove(win, posOpciones[opcion], ncols-3);
+
+		switch((key=wgetch(win))){
+			case '\33':
+			case 'q':
+			case 'Q':
+				loop=0;
+				break;
+			
+			case KEY_UP:
+				opcion=(opcion)?opcion-1: nopciones-1;
+				break;
+			case KEY_DOWN:
+				opcion=(opcion+1)%nopciones;
+				break;
+			
+			case '\n':
+				linea--;
+				curs_set(0);
+				wmove(win, linea, 1); for (int i=2; i<ncols; i++) wprintw(win, " ");
+				wattron(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
+				_gen_print(win,&linea,ncols,"¿Iniciar servidor? (S/N)",2,1);
+				wattroff(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
+				if (tolower(wgetch(win))=='s')
+					; ///////// AQUÍ FUNCIÓN PARA EL CHAT (usar strtol para el puerto). Podría hacerse loop=0 también.
+				else curs_set(1);
+				break;
+			
+			default:
+				switch (opcion)
+				{
+				case 0:
+					entrada_larga(win, posOpciones[0]+1, ncols/2-8, 16, opciones[0].valor_opcion, 16, puntumero);
+					break;
+				case 1:
+					entrada_larga(win, posOpciones[1]+1, ncols/2-3, 6, opciones[1].valor_opcion, 6, isdigit);
+					break;
+				}
+				curs_set(1);
+		}
+
+	}
+
+	curs_set(0);
+}
+
+void cliente(WINDOW* win, t_usuario usuario, int ncols){
+
+}
 
 /*
 Los dos primeros argumentos definen el porcentaje de alto y ancho que el menú ocupará.
@@ -517,8 +638,10 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 			case ' ':
 				switch (opcion){
 					case 0:
+						servidor(win, usuario, ncols);
 						break;
 					case 1:
+						cliente(win, usuario, ncols);
 						break;
 					case 2:
 						personalizar_usuario(win, &usuario, ncols);
