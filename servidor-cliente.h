@@ -4,8 +4,6 @@
 #include<netinet/in.h>
 #include<ncurses.h>
 
-#define ser "SERVER"
-#define cli "CLIENT"
 #define MAXNOM 50
 
 // Estructura describiendo un usuario y los colores a usar.
@@ -16,10 +14,10 @@ typedef struct{
 } t_usuario;
 
 int gethostip(char*);
-short f_socket(int *, char*);
+short f_socket(int *);
 void initservaddr(struct sockaddr_in *, char*, unsigned int);
-short f_bind(int, struct sockaddr_in *, char*);
-short f_listen(int, struct sockaddr_in, int, char*);
+short f_bind(int, struct sockaddr_in *);
+short f_listen(int, struct sockaddr_in, int);
 int f_accept(int, struct sockaddr_in *);
 short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titulo, short centrar_opcion, short sep_titulo, short sep_opcion);
 void _gen_print(WINDOW* win, short* linea, short ncols, char* string, short sep, short centrado);
