@@ -5,6 +5,7 @@
 #include<ncurses.h>
 
 #define MAXNOM 50
+#define MMENSAJE 500
 
 // Estructura describiendo un usuario y los colores a usar.
 typedef struct{
@@ -12,6 +13,19 @@ typedef struct{
 	short c_pair[2]; // Para el para de colores.
 	
 } t_usuario;
+
+typedef struct usuarios {
+	struct usuarios* sig;
+	short pair; // Para el par de colores.
+	int connectionfd;
+	t_usuario user;
+} t_usuarios;
+
+typedef struct mensajes {
+	struct mensajes* sig;
+	char* mensaje;
+	t_usuarios* usuario;
+} t_mensajes;
 
 int gethostip(char*);
 short f_socket(int *);

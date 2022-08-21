@@ -6,6 +6,8 @@
 #include<errno.h>
 #include<stdlib.h>
 
+#include<pthread.h>
+
 #include<ncurses.h>
 
 #include<unistd.h>
@@ -96,31 +98,33 @@ void _gen_print(WINDOW* win, short* linea, short ncols, char* string, short sep,
 			Antes: ((ncols+sep-len%(ncols+1))/2)
 		*/
 	//short c=(ncols-strlen(string)%(ncols+1))/2+sep
-	short len=strlen(string), capacidad=ncols-sep*2, uno=0;
-	if (len==1) uno=1;
+	short len=strlen(string), capacidad=ncols-sep*2;
 
 /* 
 Si hubiera problemas de optimización trabajando con grandes cantidades de texto, puede dividirse el código para cada 
 elección individualmente. Así se evita la evaluación de las sentencias if en cada iteración.
-El uso de la variable "uno" es una solución temporal para imprimir un solo carácter. Buscar a futuro una solución más
-eficiente.
 */
 	switch (centrado){ 
 		case 0:
 		case 1:
-			for (int fin=0, inicio=0; fin<len-1 || (uno--)==1;){
+			for (int fin=0, inicio=0; fin<len;){
 				if (len-fin < capacidad) fin = len-1;
 				else {
 					fin+=capacidad;
-					while (isalpha(string[fin]) && fin>inicio) fin--;
+					while (isgraph(string[fin]) && fin>inicio) fin--;
 					if (fin==inicio) fin+=capacidad-1;
 				}
 
-				while (isspace(string[fin]) && fin>inicio) fin--;
-				while (isspace(string[inicio]) && fin>inicio) inicio++;
+				while (!isgraph(string[fin]) && fin>inicio) fin--;
+				while (!isgraph(string[inicio]) && fin>inicio) inicio++;
 
 				wmove(win, (*linea)++, (centrado)? (ncols-fin+inicio)/2 : sep);
 				for (; inicio<=fin; inicio++) wprintw(win, "%c", string[inicio]);
+				if (fin==len-1) break;
+				/*
+				Buscar otra forma de que el bucle pare cuando se imprimió la última palabra.
+				Podría ser un "<" para fin en las comparaciones al imprimir y demás.
+				*/
 			}
 			break;
 		case 2:
@@ -223,12 +227,12 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 		cambios=strcmp(usuario->nombre,nombre) || usuario->c_pair[0]!=c_pair[0] || usuario->c_pair[1]!=c_pair[1];
 		if (colors_has){
 			posOpciones[0]=linea;
-			init_pair(2, c_pair[0], c_pair[1]);
-			wattron(win, COLOR_PAIR(2));
+			init_pair(1, c_pair[0], c_pair[1]);
+			wattron(win, COLOR_PAIR(1));
 			_gen_print(win, &linea, ncols, nombre, 4, 1);
-			wattroff(win, COLOR_PAIR(2));
+			wattroff(win, COLOR_PAIR(1));
 
-			for (short i=0; i<=COLOR_WHITE; i++) init_pair(i+3, 0, i);
+			for (short i=0; i<=COLOR_WHITE; i++) init_pair(i+2, 0, i);
 
 			linea+=2;
 			for (short i=0, pair; i<2; i++){
@@ -238,17 +242,17 @@ void personalizar_usuario(WINDOW *win, t_usuario* usuario, int ncols){
 				wattroff(win, A_BOLD | A_UNDERLINE | WA_LEFT);
 
 
-				pair= (c_pair[i])? c_pair[i]+2 : 10;
+				pair= (c_pair[i])? c_pair[i]+1 : 9;
 				wattron(win, COLOR_PAIR(pair));
 				mvwprintw(win, linea, ncols/2-2, " ");
 				wattroff(win, COLOR_PAIR(pair)); 
 
-				pair= c_pair[i]+3;
+				pair= c_pair[i]+2;
 				wattron(win, COLOR_PAIR(pair));
 				wprintw(win,"   ");
 				wattroff(win, COLOR_PAIR(pair));
 
-				pair= (c_pair[i]+1)%COLOR_WHITE +3;
+				pair= (c_pair[i]+1)%8 +2; // 8 == COLOR_WHITE+1
 				wattron(win, COLOR_PAIR(pair));
 				wprintw(win," ");
 				wattroff(win, COLOR_PAIR(pair));
@@ -373,10 +377,185 @@ int puntumero(int caracter){
 	return 0;
 }
 
-void servidor(WINDOW* win, t_usuario usuario, int ncols) {
+/* t_mensajes* inertaInicio(t_mensajes* lista_mensajes, char* mensaje, t_usuarios* usuario) {
+	t_mensajes* inicio = malloc(sizeof(t_mensajes));
+	inicio->sig = lista_mensajes;
+	inicio->mensaje = mensaje;
+	inicio->usuario = usuario;
+	return inicio;
+} */
+
+t_mensajes* insertaMensaje(t_mensajes* lista_mensajes, char* mensaje, t_usuarios* usuario) {
+	t_mensajes* aux = malloc(sizeof(t_mensajes));
+	aux->sig=lista_mensajes;
+	aux->mensaje = mensaje;
+	aux->usuario = usuario;
+	return aux;
+}
+
+void imprime_mensajes(WINDOW* win, const t_mensajes* mensajes, short y, short x, short nlines, short ncols, short lineaInicial) {
+	int len, cadLen;
+	char *cadenas[2], *string;
+
+	while (mensajes!=NULL){
+		cadenas[0]=mensajes->mensaje;
+		cadenas[1]=mensajes->usuario->user.nombre;
+
+		cadLen=sizeof(cadenas)/sizeof(cadenas[0]);
+
+		for (int i=0; i < cadLen; i++){
+			string = cadenas[i];
+			len=strlen(string);
+			if (i==1) {
+				wattron(win, COLOR_PAIR(mensajes->usuario->pair));
+			}
+			for (int abajo=len-1, arriba=len-1; abajo>-1;){
+				if (!nlines) return;
+				if (abajo < ncols) arriba = 0;
+				else {
+					arriba-=ncols; 
+					while (isgraph(string[arriba]) && arriba<abajo) arriba++;
+					if (arriba==abajo) arriba-=ncols-1;
+				}
+				while (!isgraph(string[arriba]) && arriba<abajo) arriba++;
+				while (!isgraph(string[abajo]) && arriba<abajo) abajo--;
+				if (!lineaInicial) {
+					wmove(win, y+(--nlines), x);
+					for (int j=arriba; j<=abajo; j++) wprintw(win, "%c", string[j]);
+				}
+				else lineaInicial--;
+				abajo=arriba;
+				if (!abajo) break;
+			}
+			wattroff(win, COLOR_PAIR(mensajes->usuario->pair));
+		}
+		mensajes=mensajes->sig;
+	}
+
+}
+
+void agregaUsuario(t_usuarios* usuarios, int connectionfd, t_usuario* user) {
+	// La lista enlazada ya debe de tener el primer nodo hecho.
+	while (usuarios->sig!=NULL){
+		if (usuarios->pair+1!=usuarios->sig->pair) break;
+		usuarios=usuarios->sig;
+	}
+	t_usuarios* usuario = malloc(sizeof(t_usuarios));
+	usuario->sig=usuarios->sig;
+	usuario->pair=usuarios->pair+1;
+	usuario->connectionfd=connectionfd;
+	usuario->user=*user;
+	init_pair(usuario->pair, user->c_pair[0], user->c_pair[1]);
+
+	usuarios->sig=usuario;
+}
+
+void libera_mensajes(t_mensajes* mensajes){
+	t_mensajes* aux;
+	while(mensajes!=NULL) {
+		aux=mensajes;
+		mensajes=mensajes->sig;
+		free(aux);
+	}
+}
+
+void libera_usuarios(t_usuarios* usuarios) {
+	t_usuarios* aux;
+	while (usuarios!=NULL) {
+		aux=usuarios;
+		usuarios=usuarios->sig;
+		free(aux);
+	}
+}
+
+/*
+Para agregar conecciones de clientes.
+*/
+void* aceptador(void* args) { // Cancelar el thread cuando ya no se use con la función pthread_cancel.
+	t_usuarios *users = args;
+	t_usuario user;
+	int connectionfd, sockfd = users->connectionfd;
+
+	while (1) {
+		// Podría agergarse una variable struct sockaddr para guardar datos del usuario.
+		connectionfd = accept(sockfd, NULL, NULL); 
+		if(read(connectionfd, &user, sizeof(t_usuario))!=-1){
+			agregaUsuario(users, connectionfd, &user);
+		}
+
+	}
+}
+
+struct _imprimirMensajes_args {
+	WINDOW* win;
+	const t_mensajes* mensajes;
+	short y;
+	short x;
+	short nlines;
+	short ncols;
+	short* lineaInicial;
+};
+
+void* llamaimprimir(void* args) {
+	struct _imprimirMensajes_args argsConv = \
+	*((struct _imprimirMensajes_args*)args);
+
+	WINDOW* win=argsConv.win;
+	const t_mensajes* mensajes=argsConv.mensajes;
+	short y=argsConv.y;
+	short x=argsConv.x;
+	short nlines=argsConv.nlines;
+	short ncols=argsConv.ncols;
+	short lineaInicial=*argsConv.lineaInicial;
+
+	while (1) {
+		imprime_mensajes(win, mensajes, y , x, nlines, ncols, lineaInicial);
+	}
+}
+
+void chat(WINDOW* win, t_usuarios* usuarios, t_mensajes* mensajes, int ncols, int nlines) {
+	short lineaInicial=1, key;
+	bool loop=1;
+	char *buffer=malloc(MMENSAJE+1);
+	struct _imprimirMensajes_args args = {
+		win, mensajes, 1, 1, nlines-6, ncols-2, &lineaInicial
+	};
+
+	pthread_t thread_accept;
+	pthread_create(&thread_accept, NULL, aceptador, usuarios);
+	pthread_t thread_imprimensajes;
+	pthread_create(&thread_imprimensajes, NULL, llamaimprimir, (void*)(&args)); 
+	
+	pthread_join(thread_accept, NULL); // El código no avanza de aquí.
+	pthread_join(thread_imprimensajes, NULL);
+
+	while (loop) {
+		switch((key=wgetch(win))){
+			case KEY_UP:
+				lineaInicial++;
+				break;
+			case KEY_DOWN:
+				if (lineaInicial<2) lineaInicial=0;
+				else lineaInicial--;
+				break;
+			
+			default:
+				entrada_larga(win, nlines-2, 1, ncols-2, buffer, MMENSAJE+1, NULL);
+				insertaMensaje(mensajes, buffer, usuarios);
+				buffer=malloc(MMENSAJE+1);
+		} ////// EN PROCESO...
+	}
+	
+}
+
+void servidor(WINDOW* win, t_usuario usuario, int ncols, int nlines) {
 	int sockfd, connectionfd; // Variables para los files descriptor.
+	unsigned int len; // Nada útil, pero necesaria para que accept no dé error.
 	struct sockaddr_in servaddr, client;
 	t_usuario cliente;
+	t_mensajes* mensajes = NULL;
+	t_usuarios* usuarios;
+
 
 	short loop=1, opcion=0, linea, key;
 	char ip[16], puerto[6]="8000", maxClients[4]="10", ip_puerto[21];
@@ -393,18 +572,18 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 	short len_opciones=sizeof(opciones)/sizeof(opciones[0]), posOpciones[len_opciones];
 
 	curs_set(1);
-	init_pair(11, COLOR_RED, COLOR_BLACK); // Malo.
-	init_pair(12, COLOR_GREEN, COLOR_BLACK); // Bueno.
+	init_pair(2, COLOR_RED, COLOR_BLACK); // Malo.
+	init_pair(3, COLOR_GREEN, COLOR_BLACK); // Bueno.
 
 	while (loop){
 		werase(win);
 		linea=1;
 		box(win, 0, 0);
 
-		init_pair(2, usuario.c_pair[0], usuario.c_pair[1]);
-		wattron(win, COLOR_PAIR(2));
+		init_pair(1, usuario.c_pair[0], usuario.c_pair[1]);
+		wattron(win, COLOR_PAIR(1));
 		_gen_print(win, &linea, ncols, usuario.nombre, 4, 1);
-		wattroff(win, COLOR_PAIR(2));
+		wattroff(win, COLOR_PAIR(1));
 		linea++;
 
 		wattron(win, A_BOLD);
@@ -459,13 +638,13 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 					if (tolower(wgetch(win))=='s') {
 						werase(win); linea=1;
 						box(win, 0, 0);
-						wattron(win, COLOR_PAIR(12));
+						wattron(win, COLOR_PAIR(3));
 
 						if ((sockfd = socket(AF_INET, SOCK_STREAM, 0))==-1) {
-							wattroff(win, COLOR_PAIR(12));
-							wattron(win, COLOR_PAIR(11));
+							wattroff(win, COLOR_PAIR(3));
+							wattron(win, COLOR_PAIR(2));
 							_gen_print(win,&linea,ncols, "[SERVER-error]: creación del socket fallida.", 2, 0);
-							wattroff(win, COLOR_PAIR(11));
+							wattroff(win, COLOR_PAIR(2));
 							wgetch(win);
 							break;
 						}
@@ -475,10 +654,10 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 						initservaddr(&servaddr, opciones[0].valor_opcion, strtol(opciones[1].valor_opcion, NULL, 10));
 
 						if (bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))!=0){
-							wattroff(win, COLOR_PAIR(12));
-							wattron(win, COLOR_PAIR(11));
+							wattroff(win, COLOR_PAIR(3));
+							wattron(win, COLOR_PAIR(2));
 							_gen_print(win,&linea,ncols, "[SERVER-error]: llamada bind fallida.", 2, 0);
-							wattroff(win, COLOR_PAIR(11));
+							wattroff(win, COLOR_PAIR(2));
 							wgetch(win);
 							break;
 						}
@@ -486,44 +665,60 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 						linea++;
 						
 						if (listen(sockfd, strtol(opciones[2].valor_opcion, NULL, 10))!=0){
-							wattroff(win, COLOR_PAIR(12));
-							wattron(win, COLOR_PAIR(11));
+							wattroff(win, COLOR_PAIR(3));
+							wattron(win, COLOR_PAIR(2));
 							_gen_print(win,&linea,ncols, "[SERVER-error]: estado de escucha fallido.", 2, 0);
-							wattroff(win, COLOR_PAIR(11));
+							wattroff(win, COLOR_PAIR(2));
 							wgetch(win);
 							break;
 						}
 						else _gen_print(win,&linea,ncols, "[SERVER]: en estado de escucha.", 2, 0);
 						linea++;
-						wattroff(win, COLOR_PAIR(12));
+						wattroff(win, COLOR_PAIR(3));
 
 						sprintf(ip_puerto, "%s:%s", opciones[0].valor_opcion, opciones[1].valor_opcion);
 						
-						wattron(win, COLOR_PAIR(2));
+						wattron(win, COLOR_PAIR(1));
 						_gen_print(win, &linea, ncols, usuario.nombre, 4, 1);
-						wattroff(win, COLOR_PAIR(2));
+						wattroff(win, COLOR_PAIR(1));
 						linea++;
-
-						wattron(win, A_BOLD | A_BLINK);
-						_gen_print(win,&linea,ncols,"A la escucha en:",4,1);
-						wattroff(win, A_BOLD | A_BLINK);
-						_gen_print(win,&linea,ncols,ip_puerto,4,1);
-
-						wrefresh(win);
 						
 						do {
-							connectionfd = accept(sockfd, (struct sockaddr*)&client, NULL);
+							wattron(win, A_BOLD | A_BLINK);
+							_gen_print(win,&linea,ncols,"A la escucha en:",4,1);
+							wattroff(win, A_BOLD | A_BLINK);
+							_gen_print(win,&linea,ncols,ip_puerto,4,1);
+	
+							wrefresh(win);
+	
+							if ((connectionfd = accept(sockfd, (struct sockaddr*)&client, &len))==-1) {
+								wattron(win, COLOR_PAIR(2));
+								_gen_print(win,&linea,ncols, "[SERVER-error]: error en llamada accept.", 2, 0);
+								wattroff(win, COLOR_PAIR(2));
+								wgetch(win);
+								break;
+							}
 							werase(win); box(win, 0, 0); linea=1;
 							if (read(connectionfd, &cliente, sizeof(cliente))==-1) {
-								wattron(win, COLOR_PAIR(11));
+								wattron(win, COLOR_PAIR(2));
 								_gen_print(win,&linea,ncols, "[SERVER-error]: error al leer datos.", 2, 0);
-								wattroff(win, COLOR_PAIR(11));
+								wattroff(win, COLOR_PAIR(2));
 							}
 							else {
-								write(connectionfd, &usuario, sizeof(usuario));
-								///////// AQUÍ FUNCIÓN PARA EL CHAT.
+								usuarios=malloc(sizeof(t_usuarios));
+								init_pair(4, usuario.c_pair[0], usuario.c_pair[1]);
+								*usuarios=(t_usuarios){NULL, 3, connectionfd, usuario};
 
-								_gen_print(win,&linea,ncols, "[SERVER]: socket cliente cerrado", 2, 1);
+								write(connectionfd, &usuario, sizeof(usuario));
+								agregaUsuario(usuarios, connectionfd, &cliente);
+								
+								chat(win, usuarios, mensajes, ncols, nlines);
+								libera_mensajes(mensajes);
+								libera_usuarios(usuarios);
+								// Agregar función para liberar la memoria de la lista enlazada.
+
+								break;
+								//_gen_print(win,&linea,ncols, "[SERVER]: socket cliente cerrado", 2, 1);
 							}
 							wattron(win, A_STANDOUT | A_UNDERLINE | A_BOLD);
 							_gen_print(win,&linea,ncols,"¿Atender a otro cliente? (S/N)",2,1);
@@ -558,7 +753,7 @@ void servidor(WINDOW* win, t_usuario usuario, int ncols) {
 	curs_set(0);
 }
 
-void cliente(WINDOW* win, t_usuario usuario, int ncols){
+void cliente(WINDOW* win, t_usuario usuario, int ncols, int nlines){
 	int sockfd;
 	struct sockaddr_in servaddr;
 	t_usuario servidor;
@@ -578,18 +773,18 @@ void cliente(WINDOW* win, t_usuario usuario, int ncols){
 	short len_opciones=sizeof(opciones)/sizeof(opciones[0]), posOpciones[len_opciones];
 
 	curs_set(1);
-	init_pair(11, COLOR_RED, COLOR_BLACK); // Malo.
-	init_pair(12, COLOR_GREEN, COLOR_BLACK); // Bueno.
+	init_pair(2, COLOR_RED, COLOR_BLACK); // Malo.
+	init_pair(3, COLOR_GREEN, COLOR_BLACK); // Bueno.
+	init_pair(1, usuario.c_pair[0], usuario.c_pair[1]);
 
 	while (loop){
 		werase(win);
 		linea=1;
 		box(win, 0, 0);
 
-		init_pair(2, usuario.c_pair[0], usuario.c_pair[1]);
-		wattron(win, COLOR_PAIR(2));
+		wattron(win, COLOR_PAIR(1));
 		_gen_print(win, &linea, ncols, usuario.nombre, 4, 1);
-		wattroff(win, COLOR_PAIR(2));
+		wattroff(win, COLOR_PAIR(1));
 		linea++;
 
 		wattron(win, A_BOLD);
@@ -645,18 +840,18 @@ void cliente(WINDOW* win, t_usuario usuario, int ncols){
 						werase(win); linea=1;
 						box(win, 0, 0);
 						
-						wattron(win, COLOR_PAIR(2));
+						wattron(win, COLOR_PAIR(1));
 						_gen_print(win, &linea, ncols, usuario.nombre, 4, 1);
-						wattroff(win, COLOR_PAIR(2));
+						wattroff(win, COLOR_PAIR(1));
 						linea++;
 						
-						wattron(win, COLOR_PAIR(12));
+						wattron(win, COLOR_PAIR(3));
 						
 						if ((sockfd = socket(AF_INET, SOCK_STREAM, 0))==-1) {
-							wattroff(win, COLOR_PAIR(12));
-							wattron(win, COLOR_PAIR(11));
+							wattroff(win, COLOR_PAIR(3));
+							wattron(win, COLOR_PAIR(2));
 							_gen_print(win,&linea,ncols, "[CLIENT-error]: creación del socket fallida.", 2, 0);
-							wattroff(win, COLOR_PAIR(11));
+							wattroff(win, COLOR_PAIR(2));
 							wgetch(win);
 							break;
 						}
@@ -669,28 +864,28 @@ void cliente(WINDOW* win, t_usuario usuario, int ncols){
 						nintentos=strtol(opciones[2].valor_opcion, NULL, 10);
 
 						while (nintentos){
-							wattroff(win, COLOR_PAIR(12));
+							wattroff(win, COLOR_PAIR(3));
 							_gen_print(win, &linea, ncols, "Intentando conectarse a", 2, 1);
 							wattron(win, A_BOLD);
 							_gen_print(win, &linea, ncols, ip_puerto, 2, 1);
 							wattroff(win, A_BOLD);
 
 							if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))!=0){
-								wattron(win, COLOR_PAIR(11));
+								wattron(win, COLOR_PAIR(2));
 								_gen_print(win,&linea,ncols, "[CLIENT-error]: conección con el servidor fallida.", 2, 0);
 								wrefresh(win);
-								wattroff(win, COLOR_PAIR(11));
+								wattroff(win, COLOR_PAIR(2));
 								nintentos--;
 								sleep(5);
 							}
 							else {
-								wattron(win, COLOR_PAIR(12));
+								wattron(win, COLOR_PAIR(3));
 								_gen_print(win,&linea,ncols, "[CLIENT]: conectado al servidor.", 2, 0);
 								linea++;
 								break;
 							}
 						}
-						wattroff(win, COLOR_PAIR(12));
+						wattroff(win, COLOR_PAIR(3));
 						if (!nintentos) break;
 						wrefresh(win);
 
@@ -699,11 +894,11 @@ void cliente(WINDOW* win, t_usuario usuario, int ncols){
 						wattroff(win, A_BOLD | A_BLINK);
 						_gen_print(win,&linea,ncols,ip_puerto,4,1);
 
-						write(sockfd, &usuario, sizeof(usuario));
-						if (read(sockfd, &servidor, sizeof(cliente))==-1) {
-							wattron(win, COLOR_PAIR(11));
-							_gen_print(win,&linea,ncols, "[CLIENT-error]: error al leer datos.", 2, 0);
-							wattroff(win, COLOR_PAIR(11));
+						if ((write(sockfd, &usuario, sizeof(usuario))==-1) || (read(sockfd, &servidor, sizeof(cliente))==-1)) {
+							wattron(win, COLOR_PAIR(2));
+							_gen_print(win,&linea,ncols, "[CLIENT-error]: error al leer/escribir datos.", 2, 0);
+							wattroff(win, COLOR_PAIR(2));
+							wrefresh(win);
 							wgetch(win);
 						}
 						else {
@@ -857,14 +1052,13 @@ short _gen_menu_principal(float alto_porc, float ancho_porc, short centrar_titul
 			case ' ':
 				switch (opcion){
 					case 0:
-						servidor(win, usuario, ncols);
+						servidor(win, usuario, ncols, nlines);
 						break;
 					case 1:
-						cliente(win, usuario, ncols);
+						cliente(win, usuario, ncols, nlines);
 						break;
 					case 2:
 						personalizar_usuario(win, &usuario, ncols);
-						init_pair(1, usuario.c_pair[0], usuario.c_pair[1]);
 						break;
 
 
